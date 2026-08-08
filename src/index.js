@@ -22,6 +22,7 @@ const {
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 
+const fs = require('fs');
 const db = require('./db');
 const { generateReply } = require('./minimax');
 
@@ -32,10 +33,23 @@ const MAX_DELAY_MS = Number(process.env.MAX_DELAY_MS || 5000);
 // While TEST_MODE is true, the bot ONLY replies to numbers in ALLOWED_NUMBERS.
 // This lets you test safely with one friend before opening it to everyone.
 const TEST_MODE = (process.env.TEST_MODE || 'true').toLowerCase() === 'true';
-const ALLOWED_NUMBERS = (process.env.ALLOWED_NUMBERS || '')
-  .split(',')
-  .map((n) => n.trim())
-  .filter(Boolean);
+
+// Helper to safely load allowed numbers from config/allowed-numbers.json
+function loadAllowedNumbers() {
+  const jsonPath = path.join(__dirname, '..', 'config', 'allowed-numbers.json');
+  let fileNumbers = [];
+  try {
+    if (fs.existsSync(jsonPath)) {
+      fileNumbers = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    }
+  } catch (err) {
+    console.error('⚠️ Could not parse config/allowed-numbers.json:', err.message);
+  }
+  const envNumbers = (process.env.ALLOWED_NUMBERS || '').split(',').map((n) => n.trim()).filter(Boolean);
+  return Array.from(new Set([...fileNumbers, ...envNumbers]));
+}
+
+const ALLOWED_NUMBERS = loadAllowedNumbers();
 
 /**
  * A WhatsApp chat ID (jid) looks like "923001234567@s.whatsapp.net".

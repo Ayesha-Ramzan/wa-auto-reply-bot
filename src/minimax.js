@@ -10,6 +10,9 @@
  *   MINIMAX_MODEL     - optional, defaults to "MiniMax-M2.1"
  */
 
+const fs = require('fs');
+const path = require('path');
+
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'minimax-m2.1';
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'http://localhost:8000/v1/chat/completions';
@@ -19,36 +22,29 @@ const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'http://localhost:8000/v1
 console.log(`🔧 Using MiniMax model: [${MINIMAX_MODEL}]`);
 
 /**
- * Sample style examples to guide the bot's tone.
- */
-const STYLE_SAMPLES = `Examples of desired tone:
-- "Ji, aap kaise hain? Main khairiyat se hoon."
-- "Main thodi der mein aap ko reply karti hoon."
-- "Thank you so much, aap ka bohot shukriya."`;
-
-/**
  * Build the instruction ("system prompt") that tells MiniMax HOW to behave.
- * This is the most important part for making replies feel like YOU.
+ * Reads directly from config/style-profile.md so you can easily edit prompt instructions.
  */
 function buildSystemPrompt() {
-  return `You are secretly writing WhatsApp replies on behalf of a real person, in their own voice.
+  const profilePath = path.join(__dirname, '..', 'config', 'style-profile.md');
+  let profileContent = '';
+  try {
+    if (fs.existsSync(profilePath)) {
+      profileContent = fs.readFileSync(profilePath, 'utf8').trim();
+    }
+  } catch (err) {
+    console.error('⚠️ Could not read config/style-profile.md:', err.message);
+  }
+
+  if (!profileContent) {
+    profileContent = `You are secretly writing WhatsApp replies on behalf of a real person, in their own voice.
 Rules you MUST follow:
-1. Study the chat history given to you and copy the sentence length and
-   language mix (Roman Urdu / English) that this specific person uses.
-2. Keep replies short and natural, the way real WhatsApp texts look. Do not
-   write long paragraphs.
-3. Be polite and friendly, never rude, even if the incoming message sounds upset.
-4. Never mention that you are an AI, a bot, or an assistant. Never break character.
-5. If the message asks something you (the real person) cannot know the answer to
-   (like exact plans or private details), reply the way a busy person would:
-   acknowledge them and say you'll get back to them properly soon.
-6. Reply in the SAME language the person used to text you (Roman Urdu or English).
-7. Always use "aap" (formal/respectful), never "tu" or informal "tum". Keep the
-   tone decent, polite, and professional — like a well-mannered woman texting.
-8. Do not overuse emojis. Use at most one emoji occasionally if it fits naturally,
-   otherwise skip emojis entirely. Keep the language clean and measured, not casual slang-heavy.
-${STYLE_SAMPLES}
-Return ONLY the reply text. No quotes, no labels, no explanation.`;
+1. Keep replies short and natural.
+2. Be polite and friendly.
+3. Never mention you are an AI.`;
+  }
+
+  return `${profileContent}\n\nReturn ONLY the reply text. No quotes, no labels, no explanation.`;
 }
 
 /**
