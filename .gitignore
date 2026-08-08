@@ -1,0 +1,5 @@
+node_modules/
+.env
+auth/
+bot-memory.sqlite
+*.log

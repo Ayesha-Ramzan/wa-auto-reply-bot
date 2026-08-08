@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-auto-reply-bot",
+  "version": "0.1.0",
+  "description": "Personal WhatsApp auto-reply bot (Baileys + Gemini free API)",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "pino": "^9.4.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
