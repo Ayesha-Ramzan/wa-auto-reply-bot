@@ -34,43 +34,54 @@ const MAX_DELAY_MS = Number(process.env.MAX_DELAY_MS || 5000);
 // This lets you test safely with one friend before opening it to everyone.
 const TEST_MODE = (process.env.TEST_MODE || 'true').toLowerCase() === 'true';
 
-// Helper to safely load allowed numbers from config/allowed-numbers.json
-function loadAllowedNumbers() {
+// Helper to safely load allowed numbers from config/allowed-numbers.json & .env
+function getLatestAllowedNumbers() {
   const jsonPath = path.join(__dirname, '..', 'config', 'allowed-numbers.json');
   let fileNumbers = [];
   try {
     if (fs.existsSync(jsonPath)) {
-      fileNumbers = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      if (Array.isArray(parsed)) {
+        fileNumbers = parsed.map((n) => String(n).trim().replace(/[^0-9]/g, '')).filter(Boolean);
+      }
     }
   } catch (err) {
     console.error('⚠️ Could not parse config/allowed-numbers.json:', err.message);
   }
-  const envNumbers = (process.env.ALLOWED_NUMBERS || '').split(',').map((n) => n.trim()).filter(Boolean);
+  const envNumbers = (process.env.ALLOWED_NUMBERS || '')
+    .split(',')
+    .map((n) => String(n).trim().replace(/[^0-9]/g, ''))
+    .filter(Boolean);
+
   return Array.from(new Set([...fileNumbers, ...envNumbers]));
 }
 
-const ALLOWED_NUMBERS = loadAllowedNumbers();
-
 /**
- * A WhatsApp chat ID (jid) looks like "923001234567@s.whatsapp.net".
- * We extract just the number part and check it against our allowlist.
+ * A WhatsApp chat ID (jid) looks like "923001234567@s.whatsapp.net" or "252772515582130@lid".
+ * We extract the number part and check it against our allowlist.
  */
-function isAllowedChat(chatId, realNumberIfKnown) {
-  // Channels/Newsletters are broadcast content, not real people chatting
-  // with you. Never treat these as a conversation to reply to.
+function isAllowedChat(chatId, realNumberIfKnown, msg) {
+  // Channels/Newsletters are broadcast content
   if (chatId.endsWith('@newsletter')) return false;
 
   if (!TEST_MODE) return true; // rollout finished, everyone is allowed
 
   if (chatId.endsWith('@g.us')) return false; // safety: never auto-reply in groups during test mode
 
-  const number = chatId.split('@')[0];
-  if (ALLOWED_NUMBERS.includes(number)) return true;
+  const allowed = getLatestAllowedNumbers();
 
-  // If Baileys happened to give us the real phone number too, check that as well
+  // Extract raw numeric digits
+  const rawIdNumber = chatId.split('@')[0].replace(/[^0-9]/g, '');
+  if (allowed.includes(rawIdNumber)) return true;
+
   if (realNumberIfKnown) {
     const cleanReal = realNumberIfKnown.split('@')[0].replace(/[^0-9]/g, '');
-    if (ALLOWED_NUMBERS.includes(cleanReal)) return true;
+    if (allowed.includes(cleanReal)) return true;
+  }
+
+  if (msg?.key?.participant) {
+    const cleanPart = msg.key.participant.split('@')[0].replace(/[^0-9]/g, '');
+    if (allowed.includes(cleanPart)) return true;
   }
 
   return false;
@@ -162,7 +173,7 @@ async function startBot() {
 
       // Always save to memory (useful history for later), but only
       // actually REPLY if this chat is allowed during test mode.
-      if (isAllowedChat(chatId, realNumberIfKnown)) {
+      if (isAllowedChat(chatId, realNumberIfKnown, msg)) {
         await handleAndReply(sock, chatId);
       } else {
         console.log(`⏸️  TEST_MODE active — skipping reply to ${chatId} (not in allowlist)`);
